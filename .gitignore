@@ -353,3 +353,8 @@ MigrationBackup/
 # ContosoDashboard Local Uploads Storage
 ContosoDashboard/AppData/uploads/*
 !ContosoDashboard/AppData/uploads/.gitkeep
+
+# SQLite local databases
+*.db
+*.db-shm
+*.db-wal
