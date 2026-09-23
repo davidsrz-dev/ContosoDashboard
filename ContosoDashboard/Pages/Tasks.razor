@@ -5,6 +5,7 @@
 @using System.Security.Claims
 @attribute [Authorize]
 @inject ITaskService TaskService
+@inject IDocumentService DocumentService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>My Tasks - ContosoDashboard</PageTitle>
@@ -135,6 +136,111 @@
     }
 </div>
 
+<!-- Task Details & Document Attachments Modal -->
+@if (isDetailsModalOpen && selectedTask != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow border-0">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title">
+                        <i class="bi bi-card-checklist me-2 text-primary"></i>
+                        @selectedTask.Title
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="() => isDetailsModalOpen = false"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="text-muted small">Prioridad</label>
+                            <div><span class="badge bg-@GetPriorityColor(selectedTask.Priority)">@selectedTask.Priority</span></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="text-muted small">Estado</label>
+                            <div><span class="badge bg-secondary">@selectedTask.Status</span></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="text-muted small">Proyecto</label>
+                            <div>@(selectedTask.Project?.Name ?? "Sin Proyecto")</div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(selectedTask.Description))
+                    {
+                        <div class="mb-4">
+                            <label class="text-muted small">Descripción</label>
+                            <p class="text-dark bg-light p-2 rounded">@selectedTask.Description</p>
+                        </div>
+                    }
+
+                    <!-- Documents Attached Section -->
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0 fw-bold">
+                            <i class="bi bi-paperclip me-1 text-primary"></i> Documentos Adjuntos (@taskDocuments.Count)
+                        </h6>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="ToggleAttachDropdown">
+                            <i class="bi bi-plus-circle me-1"></i> Adjuntar Documento
+                        </button>
+                    </div>
+
+                    @if (showAttachDropdown)
+                    {
+                        <div class="card p-3 mb-3 bg-light border">
+                            <label class="form-label small fw-bold">Seleccionar Documento para Adjuntar</label>
+                            <div class="input-group input-group-sm">
+                                <select class="form-select" @bind="selectedDocToAttachId">
+                                    <option value="0">-- Seleccionar de mis documentos --</option>
+                                    @foreach (var d in userAvailableDocuments.Where(ud => !taskDocuments.Any(td => td.DocumentId == ud.DocumentId)))
+                                    {
+                                        <option value="@d.DocumentId">@d.Title (@d.OriginalFileName)</option>
+                                    }
+                                </select>
+                                <button class="btn btn-primary" @onclick="AttachSelectedDocument" disabled="@(selectedDocToAttachId == 0)">
+                                    Vincular
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (!taskDocuments.Any())
+                    {
+                        <div class="alert alert-light border text-muted small text-center py-3">
+                            No hay documentos adjuntos a esta tarea.
+                        </div>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush border rounded">
+                            @foreach (var doc in taskDocuments)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-file-earmark-text text-primary me-2"></i>
+                                        <strong>@doc.Title</strong>
+                                        <small class="text-muted ms-2 font-monospace">(@doc.OriginalFileName - @FormatFileSize(doc.FileSize))</small>
+                                    </div>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/api/documents/@doc.DocumentId/download" class="btn btn-outline-secondary" download="@doc.OriginalFileName" title="Descargar">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                        <button class="btn btn-outline-danger" title="Desvincular de la tarea" @onclick="() => DetachDocument(doc.DocumentId)">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="() => isDetailsModalOpen = false">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<TaskItem>? tasks;
     private string filterStatus = "";
@@ -180,14 +286,61 @@
         }
     }
 
-    private void ShowCreateTaskModal()
+    private bool isDetailsModalOpen = false;
+    private TaskItem? selectedTask;
+    private List<Document> taskDocuments = new();
+    private List<Document> userAvailableDocuments = new();
+    private bool showAttachDropdown = false;
+    private int selectedDocToAttachId = 0;
+
+    private async Task ViewTaskDetails(int taskId)
     {
-        // TODO: Implement modal dialog for creating tasks
+        selectedTask = await TaskService.GetTaskByIdAsync(taskId, currentUserId);
+        if (selectedTask != null)
+        {
+            taskDocuments = await DocumentService.GetTaskDocumentsAsync(taskId, currentUserId);
+            userAvailableDocuments = await DocumentService.GetUserDocumentsAsync(currentUserId);
+            showAttachDropdown = false;
+            selectedDocToAttachId = 0;
+            isDetailsModalOpen = true;
+        }
     }
 
-    private void ViewTaskDetails(int taskId)
+    private void ToggleAttachDropdown()
     {
-        // TODO: Navigate to task details or show modal
+        showAttachDropdown = !showAttachDropdown;
+    }
+
+    private async Task AttachSelectedDocument()
+    {
+        if (selectedTask != null && selectedDocToAttachId > 0)
+        {
+            await DocumentService.AttachDocumentToTaskAsync(selectedDocToAttachId, selectedTask.TaskId, currentUserId);
+            taskDocuments = await DocumentService.GetTaskDocumentsAsync(selectedTask.TaskId, currentUserId);
+            showAttachDropdown = false;
+            selectedDocToAttachId = 0;
+        }
+    }
+
+    private async Task DetachDocument(int documentId)
+    {
+        if (selectedTask != null)
+        {
+            await DocumentService.DetachDocumentFromTaskAsync(documentId, selectedTask.TaskId, currentUserId);
+            taskDocuments = await DocumentService.GetTaskDocumentsAsync(selectedTask.TaskId, currentUserId);
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes >= 1048576) return $"{(bytes / 1048576.0):F1} MB";
+        if (bytes >= 1024) return $"{(bytes / 1024.0):F1} KB";
+        return $"{bytes} B";
+    }
+
+    private void ShowCreateTaskModal()
+    {
+        // Placeholder for create task modal
     }
 
     private string GetPriorityColor(TaskPriority priority)

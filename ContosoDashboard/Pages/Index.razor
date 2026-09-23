@@ -5,6 +5,7 @@
 @attribute [Authorize]
 @inject IDashboardService DashboardService
 @inject INotificationService NotificationService
+@inject IDocumentService DocumentService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Dashboard - ContosoDashboard</PageTitle>
@@ -52,6 +53,14 @@
                     </div>
                 </div>
             </div>
+            <div class="col-md-3 mb-3">
+                <div class="card summary-card">
+                    <div class="card-body">
+                        <h5 class="card-title">Documents</h5>
+                        <p class="card-text display-4 text-primary">@documentCount</p>
+                    </div>
+                </div>
+            </div>
         </div>
     }
 
@@ -86,6 +95,9 @@
                 <a href="/projects" class="list-group-item list-group-item-action">
                     <i class="bi bi-folder"></i> View My Projects
                 </a>
+                <a href="/documents" class="list-group-item list-group-item-action">
+                    <i class="bi bi-folder2-open"></i> Manage Documents
+                </a>
                 <a href="/notifications" class="list-group-item list-group-item-action">
                     <i class="bi bi-bell"></i> View Notifications
                 </a>
@@ -118,6 +130,13 @@
             }
         </div>
     </div>
+
+    <!-- Recent Documents Row -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <RecentDocumentsWidget />
+        </div>
+    </div>
 </div>
 
 @code {
@@ -126,6 +145,7 @@
     private List<Notification>? recentNotifications;
     private string userName = "User";
     private int currentUserId = 0;
+    private int documentCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -146,6 +166,8 @@
             summary = await DashboardService.GetDashboardSummaryAsync(currentUserId);
             announcements = await DashboardService.GetActiveAnnouncementsAsync();
             recentNotifications = await NotificationService.GetUserNotificationsAsync(currentUserId);
+            var docStats = await DocumentService.GetDocumentStatsAsync(currentUserId);
+            documentCount = docStats.TotalAccessibleDocuments;
         }
     }
 

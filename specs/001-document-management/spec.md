@@ -11,6 +11,8 @@
 - Q: How should the system handle deleting a document that is currently attached to an active task? (FR-016) → A: Warn & detach: Display a confirmation warning identifying all attached tasks; upon user confirmation, delete the document from physical storage and database records, and automatically detach the task reference.
 - Q: How should the system handle uploading a document whose title or filename matches an existing one in the same category or project? (FR-004) → A: Allow with advisory: Allow duplicate titles (differentiated by unique ID and upload timestamp) while presenting an informational notice offering the user the option to either create a new distinct record or replace the existing document file.
 - Q: How should the system evaluate access permissions when a document is shared with an entire department? (FR-017) → A: Dynamic evaluation: The service layer dynamically verifies the requesting user's current department claims at request time, ensuring immediate permission updates whenever user department assignments change.
+- Q: When a document is uploaded to a shared project, which members should receive an in-app notification? (FR-018) → A: All active members excluding author: Notify all active project members and project managers, excluding the user who performed the upload, to eliminate redundant self-notifications.
+- Q: What should be the retention policy for document audit logs? (FR-023) → A: Indefinite immutable retention: Preserve all document audit entries permanently without automated purging to maintain full historical compliance and administrative oversight.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -146,7 +148,7 @@ As a compliance administrator or manager, I want all document lifecycle events (
 - **FR-015**: Document owners MUST be able to edit document metadata (title, description, category, tags) and replace the physical file with an updated version while preserving metadata.
 - **FR-016**: Document owners and Project Managers (for project-associated documents) MUST be able to permanently delete documents after explicit confirmation. If a document is attached to one or more active tasks, the confirmation prompt MUST identify the attached tasks and, upon confirmation, automatically remove the document reference from those tasks before deletion.
 - **FR-017**: Document owners MUST be able to share documents with specific users or departments, rendering shared documents in the recipient's "Shared with Me" view with read-only access. Department-level shares MUST be evaluated dynamically against the requesting user's current department profile at request time.
-- **FR-018**: System MUST generate in-app notifications when a document is shared with a user or when a new document is added to a project they belong to.
+- **FR-018**: System MUST generate in-app notifications when a document is shared with a user or when a new document is added to a project they belong to (notifying all active project members and managers except the uploader).
 - **FR-019**: Users viewing a task MUST be able to view attached documents and upload new documents directly from the task view, automatically linking the document to the task's parent project.
 - **FR-020**: System MUST display a "Recent Documents" widget on the dashboard home page displaying the user's 5 most recent documents, as well as a summary metric card showing total accessible document count.
 - **FR-021**: System MUST strictly enforce role-based access boundaries:
@@ -155,7 +157,7 @@ As a compliance administrator or manager, I want all document lifecycle events (
   - *Project Managers*: Manage and delete all documents linked to projects they manage.
   - *Administrators*: Full audit access to inspect and oversee all documents across the organization.
 - **FR-022**: System MUST independently verify user authorization for every data access and download operation, preventing Insecure Direct Object References (IDOR).
-- **FR-023**: System MUST maintain an immutable audit trail capturing document upload, download, preview, share, and delete actions with user ID, timestamp, and action details.
+- **FR-023**: System MUST maintain an immutable audit trail capturing document upload, download, preview, share, and delete actions with user ID, timestamp, and action details, retained permanently without automated purging for full historical compliance.
 - **FR-024**: Administrators MUST be able to view audit logs and generate summary reports on document activity patterns, popular document types, and top uploaders.
 - **FR-025**: System MUST guarantee atomic storage and data operations: if physical file persistence fails, no metadata record is created; if metadata creation fails, the physical file is purged.
 

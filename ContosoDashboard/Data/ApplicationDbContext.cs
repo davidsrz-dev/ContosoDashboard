@@ -17,10 +17,65 @@ public class ApplicationDbContext : DbContext
     public DbSet<Notification> Notifications { get; set; } = null!;
     public DbSet<ProjectMember> ProjectMembers { get; set; } = null!;
     public DbSet<Announcement> Announcements { get; set; } = null!;
+    public DbSet<Document> Documents { get; set; } = null!;
+    public DbSet<DocumentShare> DocumentShares { get; set; } = null!;
+    public DbSet<DocumentAuditLog> DocumentAuditLogs { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Configure Document relationships
+        modelBuilder.Entity<Document>()
+            .HasOne(d => d.UploadedByUser)
+            .WithMany()
+            .HasForeignKey(d => d.UploadedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Document>()
+            .HasOne(d => d.Project)
+            .WithMany()
+            .HasForeignKey(d => d.ProjectId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Document>()
+            .HasOne(d => d.Task)
+            .WithMany()
+            .HasForeignKey(d => d.TaskId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Document>()
+            .HasMany(d => d.Shares)
+            .WithOne(s => s.Document)
+            .HasForeignKey(s => s.DocumentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Document>()
+            .HasMany(d => d.AuditLogs)
+            .WithOne(a => a.Document)
+            .HasForeignKey(a => a.DocumentId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.UploadedByUserId);
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.ProjectId);
+
+        modelBuilder.Entity<Document>()
+            .HasIndex(d => d.Category);
+
+        modelBuilder.Entity<DocumentShare>()
+            .HasIndex(s => s.SharedWithUserId);
+
+        modelBuilder.Entity<DocumentShare>()
+            .HasIndex(s => s.SharedWithDepartment);
+
+        modelBuilder.Entity<DocumentAuditLog>()
+            .HasIndex(a => a.DocumentId);
+
+        modelBuilder.Entity<DocumentAuditLog>()
+            .HasIndex(a => a.UserId);
 
         // Configure User relationships
         modelBuilder.Entity<User>()
@@ -219,6 +274,57 @@ public class ApplicationDbContext : DbContext
                 PublishDate = DateTime.UtcNow,
                 ExpiryDate = DateTime.UtcNow.AddDays(30),
                 IsActive = true
+            }
+        );
+
+        // Seed sample documents
+        modelBuilder.Entity<Document>().HasData(
+            new Document
+            {
+                DocumentId = 1,
+                Title = "Contoso Dashboard Architecture Specification",
+                Description = "Core architecture guide and security requirements specification for ContosoDashboard.",
+                Category = "Project Documents",
+                OriginalFileName = "ContosoDashboard_Architecture.pdf",
+                StorageKey = "1/1/sample-architecture.pdf",
+                FileSize = 1048576,
+                ContentType = "application/pdf",
+                CreatedDate = DateTime.UtcNow.AddDays(-15),
+                UpdatedDate = DateTime.UtcNow.AddDays(-15),
+                UploadedByUserId = 1,
+                ProjectId = 1,
+                TaskId = 1,
+                Tags = "architecture, security, spec"
+            },
+            new Document
+            {
+                DocumentId = 2,
+                Title = "Employee Onboarding Guide",
+                Description = "Welcome pack and engineering handbook for new Contoso employees.",
+                Category = "Team Resources",
+                OriginalFileName = "Onboarding_Guide.docx",
+                StorageKey = "2/personal/sample-onboarding.docx",
+                FileSize = 524288,
+                ContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                CreatedDate = DateTime.UtcNow.AddDays(-10),
+                UpdatedDate = DateTime.UtcNow.AddDays(-10),
+                UploadedByUserId = 2,
+                ProjectId = null,
+                TaskId = null,
+                Tags = "onboarding, team, hr"
+            }
+        );
+
+        // Seed sample document share
+        modelBuilder.Entity<DocumentShare>().HasData(
+            new DocumentShare
+            {
+                DocumentShareId = 1,
+                DocumentId = 2,
+                SharedWithDepartment = "Engineering",
+                SharedByUserId = 2,
+                SharedDate = DateTime.UtcNow.AddDays(-10),
+                Permission = "ReadOnly"
             }
         );
     }
