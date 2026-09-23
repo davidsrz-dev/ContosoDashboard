@@ -643,7 +643,7 @@
                 var docs = await DocumentService.GetProjectDocumentsAsync(p.ProjectId, currentUserId);
                 projectDocs.AddRange(docs);
             }
-            projectDocuments = projectDocs.DistinctBy(d => d.DocumentId).OrderByDescending(d => d.CreatedDate).ToListAsync().Result;
+            projectDocuments = projectDocs.DistinctBy(d => d.DocumentId).OrderByDescending(d => d.CreatedDate).ToList();
         }
 
         if (isAdmin && activeTab == "audit")

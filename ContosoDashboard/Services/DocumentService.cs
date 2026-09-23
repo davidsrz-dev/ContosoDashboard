@@ -305,8 +305,8 @@ public class DocumentService : IDocumentService
                     UserId = recipientUserId,
                     Title = "New Project Document",
                     Message = $"{user.DisplayName} uploaded '{document.Title}' to project '{project?.Name}'.",
-                    Type = NotificationType.SystemAlert,
-                    Priority = NotificationPriority.Normal
+                    Type = NotificationType.ProjectUpdate,
+                    Priority = NotificationPriority.Informational
                 });
             }
         }
@@ -489,8 +489,8 @@ public class DocumentService : IDocumentService
             UserId = targetUserId,
             Title = "Document Shared With You",
             Message = $"{sharingUser?.DisplayName ?? "A colleague"} shared the document '{document.Title}' with you.",
-            Type = NotificationType.SystemAlert,
-            Priority = NotificationPriority.Normal
+            Type = NotificationType.SystemAnnouncement,
+            Priority = NotificationPriority.Informational
         });
 
         return true;
