@@ -9,7 +9,7 @@ public class LocalFileStorageService : IFileStorageService
     {
         _logger = logger;
         var relativePath = configuration["DocumentStorage:LocalUploadsPath"] ?? "AppData/uploads";
-        _baseStoragePath = Path.Combine(environment.ContentRootPath, relativePath);
+        _baseStoragePath = Path.GetFullPath(Path.Combine(environment.ContentRootPath, relativePath));
 
         if (!Directory.Exists(_baseStoragePath))
         {
@@ -19,8 +19,13 @@ public class LocalFileStorageService : IFileStorageService
 
     private string GetFullPath(string relativeStorageKey)
     {
+        if (string.IsNullOrWhiteSpace(relativeStorageKey))
+        {
+            throw new ArgumentException("Storage key cannot be empty.", nameof(relativeStorageKey));
+        }
+
         // Normalize slashes
-        var normalizedKey = relativeStorageKey.Replace('\\', '/').TrimStart('/');
+        var normalizedKey = relativeStorageKey.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar).TrimStart(Path.DirectorySeparatorChar);
 
         // Security check against directory traversal
         if (normalizedKey.Contains(".."))
@@ -31,7 +36,8 @@ public class LocalFileStorageService : IFileStorageService
         var fullPath = Path.GetFullPath(Path.Combine(_baseStoragePath, normalizedKey));
 
         // Ensure full path is strictly inside base storage directory
-        if (!fullPath.StartsWith(_baseStoragePath, StringComparison.OrdinalIgnoreCase))
+        var normalizedBase = _baseStoragePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
         {
             throw new UnauthorizedAccessException("Attempted to access path outside designated storage directory.");
         }
