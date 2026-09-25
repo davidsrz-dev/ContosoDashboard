@@ -1,5 +1,6 @@
 @using ContosoDashboard.Services
 @using ContosoDashboard.Models
+@using ContosoDashboard.Pages
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Authorization
 @inject IDocumentService DocumentService
@@ -39,7 +40,7 @@
                         <div class="d-flex align-items-center overflow-hidden me-2">
                             <i class="bi @GetFileIcon(doc.ContentType) fs-4 me-2"></i>
                             <div class="text-truncate">
-                                <a href="/documents" class="fw-bold text-dark text-decoration-none d-block text-truncate">
+                                <a href="javascript:void(0)" @onclick="() => selectedDocForPreview = doc" class="fw-bold text-dark text-decoration-none d-block text-truncate">
                                     @doc.Title
                                 </a>
                                 <small class="text-muted">
@@ -47,9 +48,14 @@
                                 </small>
                             </div>
                         </div>
-                        <a href="/api/documents/@doc.DocumentId/download" class="btn btn-sm btn-outline-secondary" download="@doc.OriginalFileName" title="Descargar">
-                            <i class="bi bi-download"></i>
-                        </a>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" title="Previsualizar" @onclick="() => selectedDocForPreview = doc">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <a href="/api/documents/@doc.DocumentId/download" class="btn btn-outline-secondary" download="@doc.OriginalFileName" title="Descargar">
+                                <i class="bi bi-download"></i>
+                            </a>
+                        </div>
                     </div>
                 }
             </div>
@@ -57,9 +63,12 @@
     </div>
 </div>
 
+<DocumentPreviewModal Document="selectedDocForPreview" OnClose="() => selectedDocForPreview = null" />
+
 @code {
     private List<Document> recentDocs = new();
     private bool isLoading = true;
+    private Document? selectedDocForPreview;
 
     protected override async Task OnInitializedAsync()
     {

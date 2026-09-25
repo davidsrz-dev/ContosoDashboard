@@ -179,10 +179,76 @@
                         <h6 class="mb-0 fw-bold">
                             <i class="bi bi-paperclip me-1 text-primary"></i> Documentos Adjuntos (@taskDocuments.Count)
                         </h6>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="ToggleAttachDropdown">
-                            <i class="bi bi-plus-circle me-1"></i> Adjuntar Documento
-                        </button>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-primary" @onclick="ToggleUploadForm">
+                                <i class="bi bi-cloud-arrow-up-fill me-1"></i> Subir Documento
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="ToggleAttachDropdown">
+                                <i class="bi bi-link-45deg me-1"></i> Vincular Existente
+                            </button>
+                        </div>
                     </div>
+
+                    @if (showUploadForm)
+                    {
+                        <div class="card p-3 mb-3 bg-light border">
+                            <h6 class="fw-bold mb-2 small"><i class="bi bi-upload me-1 text-primary"></i> Subir Nuevo Documento a esta Tarea</h6>
+                            @if (!string.IsNullOrEmpty(taskUploadError))
+                            {
+                                <div class="alert alert-danger py-1 small mb-2">@taskUploadError</div>
+                            }
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-7">
+                                    <label class="form-label small fw-bold mb-1">Título <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-sm" @bind="taskUploadTitle" placeholder="Ej. Entregable de tarea" required />
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label small fw-bold mb-1">Categoría <span class="text-danger">*</span></label>
+                                    <select class="form-select form-select-sm" @bind="taskUploadCategory">
+                                        @foreach (var cat in DocumentCategories.All)
+                                        {
+                                            <option value="@cat">@cat</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-1">Descripción (Opcional)</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="taskUploadDescription" placeholder="Breve nota..." />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small mb-1">Etiquetas (Opcional)</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="taskUploadTags" placeholder="etiqueta1, etiqueta2" />
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-bold mb-1">Archivo <span class="text-danger">*</span> (Máx 25 MB)</label>
+                                <InputFile OnChange="HandleTaskFileSelected" class="form-control form-control-sm" />
+                                @if (taskSelectedFile != null)
+                                {
+                                    <div class="small text-muted mt-1">
+                                        <i class="bi bi-check2 text-success me-1"></i>@taskSelectedFile.Name (@FormatFileSize(taskSelectedFile.Size))
+                                    </div>
+                                }
+                            </div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <button class="btn btn-sm btn-secondary" @onclick="() => showUploadForm = false">Cancelar</button>
+                                <button class="btn btn-sm btn-primary" @onclick="ExecuteTaskUpload" disabled="@(isTaskUploading || taskSelectedFile == null || string.IsNullOrWhiteSpace(taskUploadTitle))">
+                                    @if (isTaskUploading)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span>Subiendo...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-cloud-arrow-up-fill me-1"></i>
+                                        <span>Subir y Vincular</span>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                    }
 
                     @if (showAttachDropdown)
                     {
@@ -293,6 +359,15 @@
     private bool showAttachDropdown = false;
     private int selectedDocToAttachId = 0;
 
+    private bool showUploadForm = false;
+    private bool isTaskUploading = false;
+    private string? taskUploadError;
+    private string taskUploadTitle = string.Empty;
+    private string taskUploadCategory = DocumentCategories.ProjectDocuments;
+    private string? taskUploadDescription;
+    private string? taskUploadTags;
+    private IBrowserFile? taskSelectedFile;
+
     private async Task ViewTaskDetails(int taskId)
     {
         selectedTask = await TaskService.GetTaskByIdAsync(taskId, currentUserId);
@@ -301,8 +376,86 @@
             taskDocuments = await DocumentService.GetTaskDocumentsAsync(taskId, currentUserId);
             userAvailableDocuments = await DocumentService.GetUserDocumentsAsync(currentUserId);
             showAttachDropdown = false;
+            showUploadForm = false;
+            taskUploadError = null;
             selectedDocToAttachId = 0;
             isDetailsModalOpen = true;
+        }
+    }
+
+    private void ToggleUploadForm()
+    {
+        showUploadForm = !showUploadForm;
+        showAttachDropdown = false;
+        taskUploadError = null;
+        taskUploadTitle = string.Empty;
+        taskUploadCategory = DocumentCategories.ProjectDocuments;
+        taskUploadDescription = null;
+        taskUploadTags = null;
+        taskSelectedFile = null;
+    }
+
+    private void HandleTaskFileSelected(InputFileChangeEventArgs e)
+    {
+        taskSelectedFile = e.File;
+        taskUploadError = null;
+        if (taskSelectedFile != null && string.IsNullOrWhiteSpace(taskUploadTitle))
+        {
+            taskUploadTitle = Path.GetFileNameWithoutExtension(taskSelectedFile.Name);
+        }
+    }
+
+    private async Task ExecuteTaskUpload()
+    {
+        if (selectedTask == null || taskSelectedFile == null) return;
+        if (string.IsNullOrWhiteSpace(taskUploadTitle))
+        {
+            taskUploadError = "El título es obligatorio.";
+            return;
+        }
+
+        if (taskSelectedFile.Size > 26214400)
+        {
+            taskUploadError = "El archivo supera el tamaño máximo permitido de 25 MB.";
+            return;
+        }
+
+        isTaskUploading = true;
+        taskUploadError = null;
+
+        try
+        {
+            using var stream = taskSelectedFile.OpenReadStream(maxAllowedSize: 26214400);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            ms.Position = 0;
+
+            var model = new DocumentUploadModel
+            {
+                Title = taskUploadTitle.Trim(),
+                Category = taskUploadCategory,
+                Description = taskUploadDescription?.Trim(),
+                Tags = taskUploadTags?.Trim(),
+                FileName = taskSelectedFile.Name,
+                ContentType = taskSelectedFile.ContentType,
+                FileSize = taskSelectedFile.Size,
+                FileStream = ms
+            };
+
+            await DocumentService.UploadTaskDocumentAsync(selectedTask.TaskId, model, currentUserId);
+
+            taskDocuments = await DocumentService.GetTaskDocumentsAsync(selectedTask.TaskId, currentUserId);
+            showUploadForm = false;
+            taskSelectedFile = null;
+            taskUploadTitle = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            taskUploadError = $"Error al subir el archivo: {ex.Message}";
+        }
+        finally
+        {
+            isTaskUploading = false;
         }
     }
 

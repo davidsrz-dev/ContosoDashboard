@@ -1,91 +1,61 @@
-# Research & Technical Decisions: Document Upload and Management
+# Research & Decisions: Document Management Gap Closure
 
-**Feature**: `001-document-management`  
-**Date**: 2026-09-23  
-**Status**: Completed  
+**Feature**: `001-document-management`
+**Date**: 2026-09-24
+**Status**: Decisions recorded for planning
 
----
+This research is grounded in the current repository implementation and the user-confirmed scope decisions. No external service or package is required for the planned work.
 
-## 1. Storage Architecture & Cloud Migration Path
+## 1. Scope: Local Storage Only
 
-### Decision
-Implement an abstracted storage interface `IFileStorageService` backed by `LocalFileStorageService` for local development and offline training, storing physical files in `AppData/uploads/` outside the web root (`wwwroot`).
+**Decision**: Continue using `LocalFileStorageService` and local database providers. Do not add an Azure storage provider/deployment or antivirus/malware scanning in this delivery.
 
-### Rationale
-- Complies strictly with Constitution Principle I (*Offline-First*) and Principle II (*Infrastructure Abstraction*).
-- Prevents public URL access to uploaded files, enabling service-level authorization (IDOR prevention) before streaming file contents to the client.
-- Provides a clean swap path to `AzureBlobStorageService` via Dependency Injection in `Program.cs` without altering any business logic or UI code.
+**Rationale**: The user explicitly excluded both items from the scope. Existing local storage, unique keys, validation, and authorization remain in force. The existing storage interface is retained as the application boundary; changes to support an actual cloud backend are not planned here.
 
-### Alternatives Considered
-- *Storing directly in `wwwroot/uploads`*: Rejected because it bypasses application authorization, allowing anyone with the URL to view documents (severe IDOR violation).
-- *Storing files as `VARBINARY(MAX)` / BLOBs directly in SQL Server*: Rejected because database bloat degrades performance, backup sizes balloon, and migration to Azure Blob Storage becomes complex.
+## 2. Team Lead and Mutation Permissions
 
----
+**Decision**: Team Leads may upload documents and view/download documents uploaded by members of their department and documents in assigned projects. Team Lead status alone does not grant edit, replace, or delete rights over another user's document. Apply the detailed operation rules: owner/Admin/responsible Project Manager can edit or replace; owner/Admin/responsible Project Manager can delete, with Project Manager rights limited to managed projects.
 
-## 2. File Path Generation & Storage Safety Sequencing
+**Rationale**: The stakeholder file uses broad wording (“view/manage”), but the detailed edit/delete clauses identify narrower rights. The user selected applying the detailed rules. This keeps read access broad while making destructive operations explicit.
 
-### Decision
-Generate unique storage keys using a structured GUID pattern before database insertion:
-`{userId}/{projectId or "personal"}/{guid}.{extension}`
+## 3. Multi-file Upload Semantics
 
-**Sequencing**:
-1. Validate MIME type, extension whitelist, and file size (< 25 MB).
-2. Generate unique storage key and physical directory path.
-3. Write file stream to physical disk.
-4. Save metadata record (`Document`) to Entity Framework Core database context.
-5. If database save fails, purge physical file immediately to prevent orphaned files.
+**Decision**: Process every selected file independently and return one result per file. A failure does not roll back other successful files; a failed file leaves no record or physical file. Enforce type and 25 MB limit per file. Do not create a persistent batch entity.
 
-### Rationale
-- Enforces Constitution Principle IV (*Storage Safety & Atomic Data Operations*).
-- Prevents path traversal vulnerabilities (`../../`) by never using user-supplied filenames for filesystem paths.
-- Avoids duplicate key collisions when multiple users upload files with identical names (e.g., `Report.docx`).
-- Guarantees zero orphaned records in the database and zero orphaned files on disk.
+**Rationale**: The data model is one `Document` per physical file and already supports atomic persistence per document. A transient result list gives the UI enough state without adding batch lifecycle complexity.
 
-### Alternatives Considered
-- *Database record first, then file write*: Rejected because database rollback with file write errors is harder to coordinate and risks holding open database locks during slow file I/O.
-- *Using original filename on disk*: Rejected because of security vulnerabilities (directory traversal, command injection) and name collision risks.
+## 4. Date Range Semantics
 
----
+**Decision**: Use inclusive UTC calendar dates for the upload-date filter. Translate an entered start date to the start of that UTC day and the entered end date to the beginning of the next UTC day (exclusive query bound). Missing bounds remain unbounded; a start after end is invalid.
 
-## 3. In-Browser Document Preview & Streaming Endpoint
+**Rationale**: The existing upload timestamp (`CreatedDate`) is stored in UTC. This gives stable boundary behavior independent of host locale and avoids excluding uploads later on the selected end date.
 
-### Decision
-Implement an authorized ASP.NET Core Controller endpoint (`GET /api/documents/{id}/stream` and `GET /api/documents/{id}/download`) that:
-1. Validates user authorization via `IDocumentService.AuthorizeAccessAsync(documentId, requestingUserId)`.
-2. Serves PDFs (`application/pdf`) and images (`image/jpeg`, `image/png`) with `Content-Disposition: inline` for in-browser rendering.
-3. Serves other files or download requests with `Content-Disposition: attachment; filename="{OriginalFileName}"`.
-4. Renders PDF/image previews in a reusable Blazor modal/component using an `<iframe>` or `<img>` element pointing to the authorized stream endpoint.
+## 5. Task-Context Upload
 
-### Rationale
-- Blazor Server WebSocket connections cannot efficiently transfer large binary streams for direct browser rendering without high latency or signal saturation.
-- Native HTTP streaming endpoints leverage browser caching, range requests, and built-in PDF/image renderers while enforcing server-side authorization.
+**Decision**: Reuse `DocumentUploadModel` and `IDocumentService.UploadDocumentAsync`, setting `TaskId` and the task's parent `ProjectId` from the task loaded by the server. Do not trust parent project IDs supplied only by the browser. Preserve attach-existing and detach behavior.
 
-### Alternatives Considered
-- *Base64 encoding streams over Blazor Server SignalR circuit*: Rejected due to ~33% memory overhead and potential circuit disconnection on large files.
-- *Direct file links*: Rejected as files are outside `wwwroot` for IDOR security.
+**Rationale**: `Document` already has both relationships, so no schema change is required. Server-derived association prevents a client from linking an upload to a project unrelated to the selected task.
 
----
+## 6. Access Audit Events
 
-## 4. Authorization & IDOR Protection Model
+**Decision**: Add a Download or Preview audit event only after document authorization succeeds and the storage stream has been resolved. Capture document, actor, UTC timestamp, original filename, and action type. A direct stream request is Preview; the attachment endpoint is Download.
 
-### Decision
-Enforce authorization inside `DocumentService` for all CRUD, download, share, and delete actions:
-- **Employee**: Can view/download documents they own, documents shared with them directly or via department, and documents in projects where they are an active member.
-- **Team Lead**: Inherits Employee access plus can view/download documents uploaded by members of their department/team.
-- **Project Manager**: Can view, upload, download, and delete any document associated with projects they manage.
-- **Administrator**: Full audit inspection access across all documents and audit events.
+**Rationale**: Both actions pass through `DocumentsController`, the common authorized boundary for binary delivery. Keeping audit creation behind `IDocumentService` preserves the existing service boundary. Existing denied-access warnings remain security logs, not successful access events.
 
-### Rationale
-- Complies strictly with Constitution Principle III (*Defense-in-Depth & IDOR Prevention*).
-- Prevents unauthorized access if users manipulate IDs in URLs, Blazor parameters, or API calls.
+## 7. Administrative Reports
 
----
+**Decision**: Aggregate reports from existing `Document` and `DocumentAuditLog` records; do not persist a separate analytics warehouse. Report document types, top uploaders, and access patterns by action and time bucket, with a date range. Restrict report retrieval to Administrators in both UI and service layer.
 
-## 5. Audit Logging & Notification Integration
+**Rationale**: The training scale is approximately 500 documents and 50 users. Queries over the existing timestamped entities are sufficient to start at this scale and keep the source of truth singular; add indexes only if measurements show they are needed.
 
-### Decision
-Create a lightweight entity `DocumentAuditLog` and utilize the existing `INotificationService` in `ContosoDashboard.Services` to trigger alerts for document sharing and project uploads.
+## 8. Success Metrics and Validation
 
-### Rationale
-- Maintains complete traceability for compliance and audit reporting without requiring external SIEM dependencies.
-- Reuses existing notification UI badges and toast systems already present in the ContosoDashboard codebase.
+- Upload, list/search, and preview thresholds are verified under documented local test conditions with dataset/file size and elapsed time recorded.
+- For adoption, use `User.LastLoginDate` for users active in the first three months and distinct uploader IDs from `Document.CreatedDate` in that same window. The existing model already supplies both timestamps.
+- Category accuracy requires a human review of a sample; it cannot be inferred from category population alone.
+- Locate/open time requires timed usability sessions.
+- Zero post-launch security incidents is an operational observation from the security incident register, not a code/build assertion.
+
+## 9. Data and Dependency Impact
+
+No database migration is expected. `Document` supports task/project relationships and UTC timestamps; `DocumentAuditLog` supports action/user/time aggregation; `User.LastLoginDate` supports adoption measurement. Add only transient DTOs and service methods needed for upload results, date filtering, and report aggregates. No new package is needed.

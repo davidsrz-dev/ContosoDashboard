@@ -1,8 +1,8 @@
 # Feature Specification: Document Upload and Management
 
-**Feature Branch**: `001-document-management`  
-**Created**: 2026-09-23  
-**Status**: Draft  
+**Feature Branch**: `001-document-management`
+**Created**: 2026-09-23
+**Status**: Ready for Task Generation (Gap Closure)
 **Input**: User description: "Crear la funcionalidad de carga y gestión de documentos (Document Upload and Management) basada en los requisitos de StakeholderDocs/document-upload-and-management-feature.md"
 
 ## Clarifications
@@ -13,6 +13,14 @@
 - Q: How should the system evaluate access permissions when a document is shared with an entire department? (FR-017) → A: Dynamic evaluation: The service layer dynamically verifies the requesting user's current department claims at request time, ensuring immediate permission updates whenever user department assignments change.
 - Q: When a document is uploaded to a shared project, which members should receive an in-app notification? (FR-018) → A: All active members excluding author: Notify all active project members and project managers, excluding the user who performed the upload, to eliminate redundant self-notifications.
 - Q: What should be the retention policy for document audit logs? (FR-023) → A: Indefinite immutable retention: Preserve all document audit entries permanently without automated purging to maintain full historical compliance and administrative oversight.
+
+### Session 2026-09-24 — Gap-closure planning
+- Scope decision: Antivirus or malware scanning is excluded from this delivery. The existing extension, MIME-type, size, authorization, and safe-storage controls remain required.
+- Scope decision: Implement and validate the local filesystem provider only. No Azure Blob Storage provider or Azure deployment work is included in this delivery.
+- Team Lead permissions: Team Leads may upload documents and view/download documents uploaded by members of their department and documents in their assigned projects. The detailed operation rules govern mutations: editing/replacing is limited to the owner, Administrator, or responsible Project Manager; deletion is limited to the owner, Administrator, or responsible Project Manager. Team Lead status alone does not grant mutation rights over another user's document.
+- Multi-file upload behavior: Each selected file is processed independently. A failed file reports its own error and leaves no partial record or orphan file; successful files in the same selection remain saved.
+- Date-range behavior: Start and end dates are inclusive calendar dates evaluated against the UTC upload timestamp.
+- Adoption metric: An active user is a user with `LastLoginDate` during the three-month measurement window. The numerator is the distinct active users with at least one successful document upload during that same window.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -30,6 +38,7 @@ As a Contoso employee, I want to upload my work documents, provide metadata (tit
 2. **Given** an uploaded document in "My Documents", **When** the user clicks "Preview" on a PDF or image file, **Then** the system renders the document preview in the browser without requiring a file download.
 3. **Given** an uploaded document in "My Documents", **When** the user clicks "Download", **Then** the original file is delivered to the user's browser with its original filename and extension.
 4. **Given** a user attempting to upload a file exceeding 25 MB or with an unsupported file extension (e.g., `.exe` or `.zip`), **When** they attempt to submit the upload, **Then** the system rejects the file before persistence and displays a clear, explanatory validation error message.
+5. **Given** a user selects multiple files including both valid and invalid files, **When** they submit the selection, **Then** each file receives its own progress/result status, valid files are saved, invalid files show a clear error, and a failed file does not roll back successful files or leave an orphan.
 
 ---
 
@@ -47,6 +56,7 @@ As a project team member or project manager, I want to associate uploaded docume
 2. **Given** a team member assigned to Project Alpha navigating to the Project Documents tab, **When** they view the project documents, **Then** they see all documents associated with Project Alpha, including uploader name, upload date, and category.
 3. **Given** a user who is NOT a member of Project Alpha, **When** they browse project documents or attempt to directly view Project Alpha files, **Then** the system prevents access and excludes those documents from their view.
 4. **Given** a Project Manager managing Project Alpha, **When** viewing the project's documents, **Then** they have administrative privileges to manage or remove any document associated with that project.
+5. **Given** a Team Lead and a document uploaded by a member of the same department, **When** the Team Lead opens the document, **Then** they can view and download it but cannot edit, replace, or delete it solely because of their Team Lead role.
 
 ---
 
@@ -64,6 +74,7 @@ As a dashboard user managing multiple documents, I want to quickly search docume
 2. **Given** a user viewing their document list, **When** they filter by category "Reports" and sort by "Upload Date (Descending)", **Then** only report documents are displayed, ordered from newest to oldest.
 3. **Given** a document owner viewing their document details, **When** they update the title, description, or tags, **Then** the changes are saved and reflected immediately across all views.
 4. **Given** a document owner with an updated version of a file, **When** they select "Replace File" and upload a new valid file, **Then** the existing metadata is preserved, the physical content is updated, and the new file size and upload date are recorded.
+5. **Given** documents uploaded before, during, and after a selected UTC calendar-date range, **When** the user applies inclusive start and end dates, **Then** documents within both boundary dates are included and documents outside the range are excluded.
 
 ---
 
@@ -111,7 +122,7 @@ As a compliance administrator or manager, I want all document lifecycle events (
 **Acceptance Scenarios**:
 
 1. **Given** an authorized user deleting their uploaded document, **When** they confirm the permanent deletion prompt, **Then** the document is deleted from storage and metadata records, and an audit event is recorded.
-2. **Given** an Administrator accessing the Document Audit section, **When** viewing reports, **Then** they can inspect activity history, filter by action type (Upload, Download, Delete, Share), and view metrics on popular document types and active uploaders.
+2. **Given** an Administrator accessing the Document Audit section, **When** viewing reports for a date range, **Then** they can inspect event history, filter by action type, and view document-type counts, top uploaders, and access patterns grouped by action and period.
 3. **Given** a non-administrator user, **When** they attempt to access audit log views or compliance reports, **Then** the system denies access.
 
 ---
@@ -131,7 +142,7 @@ As a compliance administrator or manager, I want all document lifecycle events (
 
 ### Functional Requirements
 
-- **FR-001**: Users MUST be able to select and upload single or multiple files from their local system with visual progress tracking and clear completion status.
+- **FR-001**: Users MUST be able to select and upload one or multiple files from their local system with visual progress and a per-file success or failure result. Each file MUST be processed independently; a failed file MUST NOT leave a database record or orphaned physical file, and MUST NOT roll back other successful files in the selection.
 - **FR-002**: System MUST enforce a strict file type whitelist supporting only: PDF, Microsoft Word (`.doc`, `.docx`), Microsoft Excel (`.xls`, `.xlsx`), Microsoft PowerPoint (`.ppt`, `.pptx`), plain text (`.txt`), and images (`.jpg`, `.jpeg`, `.png`).
 - **FR-003**: System MUST enforce a maximum file size limit of 25 MB per file and reject oversized files with clear, user-friendly error messages.
 - **FR-004**: Users MUST provide a Document Title (required) and select a Category (required) from a predefined list: *Project Documents*, *Team Resources*, *Personal Files*, *Reports*, *Presentations*, *Other*. Duplicate titles within the same category or project are permitted (distinguished by ID and upload date), with the UI presenting an informational notice offering the option to replace the existing file or save as a new document.
@@ -140,7 +151,7 @@ As a compliance administrator or manager, I want all document lifecycle events (
 - **FR-007**: System MUST store physical files securely outside the public web root using unique non-predictable storage identifiers, preventing path traversal vulnerabilities and duplicate naming conflicts.
 - **FR-008**: System MUST provide a "My Documents" view displaying all documents uploaded by the current user, showing title, category, upload date, file size, and associated project.
 - **FR-009**: System MUST allow users to sort their document views by title, upload date, category, and file size.
-- **FR-010**: System MUST allow users to filter document views by category, associated project, and upload date range.
+- **FR-010**: System MUST allow users to filter document views by category, associated project, and upload date range. Both date boundaries are inclusive and compare to the document's UTC upload timestamp.
 - **FR-011**: System MUST provide a "Project Documents" view accessible to all project team members and managers, displaying all documents associated with that project.
 - **FR-012**: System MUST provide search capability querying title, description, tags, uploader name, and project name, returning only documents the user is authorized to view.
 - **FR-013**: System MUST provide in-browser preview capability for standard PDF and image documents without requiring a local file download.
@@ -149,16 +160,16 @@ As a compliance administrator or manager, I want all document lifecycle events (
 - **FR-016**: Document owners and Project Managers (for project-associated documents) MUST be able to permanently delete documents after explicit confirmation. If a document is attached to one or more active tasks, the confirmation prompt MUST identify the attached tasks and, upon confirmation, automatically remove the document reference from those tasks before deletion.
 - **FR-017**: Document owners MUST be able to share documents with specific users or departments, rendering shared documents in the recipient's "Shared with Me" view with read-only access. Department-level shares MUST be evaluated dynamically against the requesting user's current department profile at request time.
 - **FR-018**: System MUST generate in-app notifications when a document is shared with a user or when a new document is added to a project they belong to (notifying all active project members and managers except the uploader).
-- **FR-019**: Users viewing a task MUST be able to view attached documents and upload new documents directly from the task view, automatically linking the document to the task's parent project.
+- **FR-019**: Users viewing a task MUST be able to view and detach attached documents, attach an existing accessible document, and upload a new document directly from the task view. A new task upload MUST link the document to that task and automatically associate it with the task's parent project. All operations MUST enforce the user's task and document permissions.
 - **FR-020**: System MUST display a "Recent Documents" widget on the dashboard home page displaying the user's 5 most recent documents, as well as a summary metric card showing total accessible document count.
 - **FR-021**: System MUST strictly enforce role-based access boundaries:
   - *Employees*: Access their own documents, documents shared with them, and documents belonging to assigned projects.
-  - *Team Leads*: Access their own documents, documents belonging to their assigned projects, and documents uploaded by direct team members.
-  - *Project Managers*: Manage and delete all documents linked to projects they manage.
-  - *Administrators*: Full audit access to inspect and oversee all documents across the organization.
+  - *Team Leads*: Upload documents and view/download their own documents, documents belonging to their assigned projects, and documents uploaded by members of their department. Team Lead status alone does not grant edit, replacement, or deletion rights over another user's document.
+  - *Project Managers*: Manage documents linked to projects they manage, including editing/replacing and deleting those project documents.
+  - *Administrators*: Full access to inspect and oversee all documents and audit records across the organization.
 - **FR-022**: System MUST independently verify user authorization for every data access and download operation, preventing Insecure Direct Object References (IDOR).
-- **FR-023**: System MUST maintain an immutable audit trail capturing document upload, download, preview, share, and delete actions with user ID, timestamp, and action details, retained permanently without automated purging for full historical compliance.
-- **FR-024**: Administrators MUST be able to view audit logs and generate summary reports on document activity patterns, popular document types, and top uploaders.
+- **FR-023**: System MUST maintain an immutable audit trail capturing successful document upload, download, preview, share, edit/replacement, task attachment/detachment, and delete actions with user ID, timestamp, and action details, retained permanently without automated purging for full historical compliance.
+- **FR-024**: Administrators MUST be able to view audit logs and generate summary reports that show document activity over a selected date range, popular document types, top uploaders, and access patterns grouped by action type and period. Reports MUST be restricted to Administrators.
 - **FR-025**: System MUST guarantee atomic storage and data operations: if physical file persistence fails, no metadata record is created; if metadata creation fails, the physical file is purged.
 
 ### Key Entities
@@ -172,24 +183,25 @@ As a compliance administrator or manager, I want all document lifecycle events (
   - `StorageKey`: Internal unique identifier/path for physical file isolation (string).
   - `FileSize`: Size of the file in bytes (integer/long).
   - `ContentType`: Standard MIME type (string, up to 255 characters).
-  - `UploadedAt`: Timestamp of initial upload (datetime).
-  - `UploaderId`: Identifier of the user who uploaded the document.
+  - `CreatedDate`: Timestamp of initial upload in UTC (datetime).
+  - `UpdatedDate`: Timestamp of the latest metadata edit or file replacement in UTC (datetime).
+  - `UploadedByUserId`: Identifier of the user who uploaded the document.
   - `ProjectId`: Optional identifier of the project the document is associated with.
   - `TaskId`: Optional identifier of the task the document is attached to.
   - `Tags`: Comma-separated or collection of search tags (string/list).
 
 - **DocumentShare**:
-  - `ShareId`: Unique identifier for the share relationship (integer).
+  - `DocumentShareId`: Unique identifier for the share relationship (integer).
   - `DocumentId`: Reference to the shared document.
   - `SharedWithUserId`: Reference to specific recipient user (optional if sharing with department).
   - `SharedWithDepartment`: Department identifier or name for group sharing (optional if sharing with user).
   - `SharedByUserId`: Reference to user granting access.
-  - `SharedAt`: Timestamp when share was granted.
+  - `SharedDate`: Timestamp when share was granted in UTC.
   - `Permission`: Level of access granted (default: Read-only).
 
 - **DocumentAuditLog**:
-  - `AuditId`: Unique identifier for the audit entry (integer).
-  - `DocumentId`: Reference to the affected document.
+  - `DocumentAuditLogId`: Unique identifier for the audit entry (integer).
+  - `DocumentId`: Optional reference to the affected document; may be null so deletion history remains after the document record is removed.
   - `ActionType`: Action performed (e.g., Upload, Download, Preview, EditMetadata, ReplaceFile, Share, Delete).
   - `UserId`: Identifier of the user performing the action.
   - `Timestamp`: Precise timestamp of event occurrence.
@@ -213,8 +225,14 @@ As a compliance administrator or manager, I want all document lifecycle events (
 - **SC-003**: In-browser document preview loads and renders within 3 seconds for valid PDF and image documents.
 - **SC-004**: Users can initiate and complete a document upload workflow in 3 clicks or fewer from the document management interface.
 - **SC-005**: 100% of unauthorized document access or download attempts (via parameter manipulation or guessing identifiers) are blocked and rejected by service-level authorization.
-- **SC-006**: 70% of active dashboard users upload at least one document within 3 months of feature deployment.
-- **SC-007**: At least 90% of uploaded documents are classified with an accurate, descriptive category.
-- **SC-008**: Average time required for a user to locate and open an existing document is reduced to under 30 seconds.
+- **SC-006**: At least 70% of distinct users with a successful login during the first three months after deployment upload at least one document during that same period. Calculate both groups from `LastLoginDate` and document upload timestamps at the end of the measurement window.
+- **SC-007**: At least 90% of documents in a periodic human-reviewed sample are assigned a category that matches the document's purpose.
+- **SC-008**: In timed usability sessions with representative dashboard users, the average time to locate and open a requested document is under 30 seconds.
 - **SC-009**: 100% of failed or interrupted file uploads leave zero orphaned records in the database and zero orphaned files in physical storage.
-- **SC-010**: Zero security incidents or unauthorized document disclosures reported post-launch.
+- **SC-010**: Zero confirmed security incidents or unauthorized document disclosures are recorded in the post-launch security incident register during the measurement period.
+
+## Scope Decisions
+
+- Antivirus/malware scanning is not part of this delivery.
+- An Azure storage provider or Azure deployment is not part of this delivery. The application continues to use the local filesystem provider.
+- Performance thresholds, adoption, category accuracy, usability, and security-incident outcomes require measured validation or post-deployment evidence; a successful build alone does not satisfy them.

@@ -56,6 +56,9 @@ public class DocumentsController : ControllerBase
         var stream = await _fileStorageService.GetFileStreamAsync(document.StorageKey);
         if (stream == null) return NotFound("Physical file not found in storage.");
 
+        await _documentService.RecordDocumentAccessAsync(id, userId, "Preview");
+
+        Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
         Response.Headers["Content-Disposition"] = $"inline; filename=\"{Uri.EscapeDataString(document.OriginalFileName)}\"";
         return File(stream, document.ContentType);
     }
@@ -81,6 +84,8 @@ public class DocumentsController : ControllerBase
 
         var stream = await _fileStorageService.GetFileStreamAsync(document.StorageKey);
         if (stream == null) return NotFound("Physical file not found in storage.");
+
+        await _documentService.RecordDocumentAccessAsync(id, userId, "Download");
 
         return File(stream, document.ContentType, document.OriginalFileName);
     }

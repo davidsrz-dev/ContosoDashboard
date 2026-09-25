@@ -129,20 +129,20 @@ main {
     }
 }
 
-.nav-item {
+.sidebar .nav-item {
     font-size: 0.9rem;
     padding-bottom: 0.5rem;
 }
 
-.nav-item:first-of-type {
+.sidebar .nav-item:first-of-type {
     padding-top: 1rem;
 }
 
-.nav-item:last-of-type {
+.sidebar .nav-item:last-of-type {
     padding-bottom: 1rem;
 }
 
-.nav-link {
+.sidebar .nav-link {
     color: rgba(255, 255, 255, 0.8);
     border-radius: 4px;
     height: 3rem;
@@ -151,14 +151,50 @@ main {
     line-height: 3rem;
 }
 
-.nav-link:hover {
+.sidebar .nav-link:hover {
     background-color: rgba(255, 255, 255, 0.1);
     color: white;
 }
 
-.nav-link.active {
+.sidebar .nav-link.active {
     background-color: rgba(255, 255, 255, 0.25);
     color: white;
+}
+
+.nav-tabs .nav-item {
+    padding-bottom: 0;
+}
+
+.nav-tabs .nav-link {
+    color: #344054;
+    display: flex;
+    align-items: center;
+    height: auto;
+    line-height: 1.25;
+    padding: 0.7rem 0.9rem;
+    white-space: nowrap;
+}
+
+.nav-tabs .nav-link:hover:not(.active) {
+    color: #0b5ed7;
+    background-color: #f8f9fa;
+}
+
+.nav-tabs .nav-link.active {
+    color: #0b5ed7;
+    background-color: #fff;
+}
+
+.nav-tabs .nav-link.text-info {
+    color: #0b6b75 !important;
+}
+
+.nav-tabs .nav-link.text-success {
+    color: #146c43 !important;
+}
+
+.nav-tabs .nav-link.text-danger {
+    color: #b02a37 !important;
 }
 
 .content {

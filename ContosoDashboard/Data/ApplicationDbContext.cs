@@ -312,6 +312,74 @@ public class ApplicationDbContext : DbContext
                 ProjectId = null,
                 TaskId = null,
                 Tags = "onboarding, team, hr"
+            },
+            new Document
+            {
+                DocumentId = 3,
+                Title = "Q3 Financial Performance Report",
+                Description = "Executive summary of Q3 financial metrics and engineering budget utilization.",
+                Category = "Reports",
+                OriginalFileName = "Q3_Financial_Performance.xlsx",
+                StorageKey = "1/1/sample-q3-report.xlsx",
+                FileSize = 2097152,
+                ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                CreatedDate = DateTime.UtcNow.AddDays(-45),
+                UpdatedDate = DateTime.UtcNow.AddDays(-45),
+                UploadedByUserId = 2,
+                ProjectId = 1,
+                TaskId = null,
+                Tags = "financial, q3, report"
+            },
+            new Document
+            {
+                DocumentId = 4,
+                Title = "Sprint Planning Presentation",
+                Description = "Slide deck for Sprint 4 planning and roadmap alignment.",
+                Category = "Presentations",
+                OriginalFileName = "Sprint_Planning_Review.pptx",
+                StorageKey = "2/1/sample-sprint-deck.pptx",
+                FileSize = 5242880,
+                ContentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                CreatedDate = DateTime.UtcNow.AddDays(-30),
+                UpdatedDate = DateTime.UtcNow.AddDays(-30),
+                UploadedByUserId = 3,
+                ProjectId = 1,
+                TaskId = 2,
+                Tags = "presentation, sprint, review"
+            },
+            new Document
+            {
+                DocumentId = 5,
+                Title = "Product Architecture Diagram",
+                Description = "High-resolution system architecture and network boundary diagram.",
+                Category = "Team Resources",
+                OriginalFileName = "System_Architecture_Diagram.png",
+                StorageKey = "1/1/sample-diagram.png",
+                FileSize = 1572864,
+                ContentType = "image/png",
+                CreatedDate = DateTime.UtcNow.AddDays(-60),
+                UpdatedDate = DateTime.UtcNow.AddDays(-60),
+                UploadedByUserId = 1,
+                ProjectId = 1,
+                TaskId = 1,
+                Tags = "diagram, architecture, image"
+            },
+            new Document
+            {
+                DocumentId = 6,
+                Title = "Team Workstation Setup Notes",
+                Description = "Developer setup notes and environment configuration instructions.",
+                Category = "Personal Files",
+                OriginalFileName = "Workstation_Setup.txt",
+                StorageKey = "4/personal/sample-setup.txt",
+                FileSize = 8192,
+                ContentType = "text/plain",
+                CreatedDate = DateTime.UtcNow.AddDays(-5),
+                UpdatedDate = DateTime.UtcNow.AddDays(-5),
+                UploadedByUserId = 4,
+                ProjectId = null,
+                TaskId = null,
+                Tags = "setup, dev, notes"
             }
         );
 
@@ -325,6 +393,73 @@ public class ApplicationDbContext : DbContext
                 SharedByUserId = 2,
                 SharedDate = DateTime.UtcNow.AddDays(-10),
                 Permission = "ReadOnly"
+            }
+        );
+
+        // Seed sample document audit access logs
+        modelBuilder.Entity<DocumentAuditLog>().HasData(
+            new DocumentAuditLog
+            {
+                DocumentAuditLogId = 1,
+                DocumentId = 1,
+                ActionType = "Preview",
+                UserId = 2,
+                Timestamp = DateTime.UtcNow.AddDays(-14),
+                Details = "Inline preview generated"
+            },
+            new DocumentAuditLog
+            {
+                DocumentAuditLogId = 2,
+                DocumentId = 1,
+                ActionType = "Download",
+                UserId = 3,
+                Timestamp = DateTime.UtcNow.AddDays(-12),
+                Details = "File downloaded"
+            },
+            new DocumentAuditLog
+            {
+                DocumentAuditLogId = 3,
+                DocumentId = 2,
+                ActionType = "Preview",
+                UserId = 4,
+                Timestamp = DateTime.UtcNow.AddDays(-8),
+                Details = "Inline preview generated"
+            },
+            new DocumentAuditLog
+            {
+                DocumentAuditLogId = 4,
+                DocumentId = 3,
+                ActionType = "Download",
+                UserId = 1,
+                Timestamp = DateTime.UtcNow.AddDays(-40),
+                Details = "File downloaded"
+            },
+            new DocumentAuditLog
+            {
+                DocumentAuditLogId = 5,
+                DocumentId = 4,
+                ActionType = "Preview",
+                UserId = 2,
+                Timestamp = DateTime.UtcNow.AddDays(-28),
+                Details = "Inline preview generated"
+            },
+            new DocumentAuditLog
+            {
+                DocumentAuditLogId = 6,
+                DocumentId = 4,
+                ActionType = "Download",
+                UserId = 4,
+                Timestamp = DateTime.UtcNow.AddDays(-25),
+                Details = "File downloaded"
+            },
+            new DocumentAuditLog
+            {
+                DocumentAuditLogId = 7,
+                DocumentId = 5,
+                ActionType = "Preview",
+                UserId = 3,
+                Timestamp = DateTime.UtcNow.AddDays(-50),
+                Details = "Inline preview generated"
             }
         );
     }

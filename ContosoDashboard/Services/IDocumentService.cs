@@ -8,11 +8,15 @@ public interface IDocumentService
     Task<List<Document>> GetUserDocumentsAsync(int requestingUserId);
     Task<List<Document>> GetProjectDocumentsAsync(int projectId, int requestingUserId);
     Task<List<Document>> GetSharedDocumentsAsync(int requestingUserId);
+    Task<List<Document>> GetDepartmentDocumentsAsync(int requestingUserId);
     Task<List<Document>> SearchDocumentsAsync(string searchTerm, string? category, int? projectId, int requestingUserId);
+    Task<List<Document>> SearchDocumentsAsync(string searchTerm, string? category, int? projectId, DateOnly? startDateUtc, DateOnly? endDateUtc, int requestingUserId);
     Task<Document?> GetDocumentByIdAsync(int documentId, int requestingUserId);
+    Task<bool> CheckDuplicateTitleAsync(string title, string category, int? projectId);
 
     // Mutation Operations
     Task<Document> UploadDocumentAsync(DocumentUploadModel model, int requestingUserId);
+    Task<IReadOnlyList<DocumentUploadResult>> UploadDocumentsAsync(IReadOnlyList<DocumentUploadModel> files, int requestingUserId);
     Task<bool> UpdateDocumentMetadataAsync(int documentId, DocumentEditModel model, int requestingUserId);
     Task<bool> ReplaceDocumentFileAsync(int documentId, Stream newFileStream, string newFileName, string contentType, long fileSize, int requestingUserId);
     Task<bool> DeleteDocumentAsync(int documentId, int requestingUserId);
@@ -21,11 +25,14 @@ public interface IDocumentService
     Task<bool> ShareDocumentWithUserAsync(int documentId, int targetUserId, int requestingUserId);
     Task<bool> ShareDocumentWithDepartmentAsync(int documentId, string department, int requestingUserId);
     Task<List<Document>> GetTaskDocumentsAsync(int taskId, int requestingUserId);
+    Task<Document> UploadTaskDocumentAsync(int taskId, DocumentUploadModel model, int requestingUserId);
     Task<bool> AttachDocumentToTaskAsync(int documentId, int taskId, int requestingUserId);
     Task<bool> DetachDocumentFromTaskAsync(int documentId, int taskId, int requestingUserId);
 
-    // Authorization & Audit
+    // Authorization, Audit & Reports
     Task<bool> AuthorizeAccessAsync(int documentId, int requestingUserId);
+    Task<bool> RecordDocumentAccessAsync(int documentId, int requestingUserId, string actionType);
     Task<List<DocumentAuditLog>> GetDocumentAuditLogsAsync(int? documentId, int requestingUserId);
+    Task<DocumentActivityReport> GetDocumentActivityReportAsync(DateOnly? startDateUtc, DateOnly? endDateUtc, int requestingUserId);
     Task<DocumentSummaryStats> GetDocumentStatsAsync(int requestingUserId);
 }

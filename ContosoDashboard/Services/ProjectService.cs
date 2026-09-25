@@ -25,15 +25,21 @@ public class ProjectService : IProjectService
 
     public async Task<List<Project>> GetUserProjectsAsync(int userId)
     {
-        // Get projects where user is manager or a member
-        var managedProjects = _context.Projects
-            .Where(p => p.ProjectManagerId == userId);
+        var user = await _context.Users.FindAsync(userId);
+        IQueryable<Project> query;
 
-        var memberProjects = _context.Projects
-            .Where(p => p.ProjectMembers.Any(pm => pm.UserId == userId));
+        if (user != null && user.Role == UserRole.Administrator)
+        {
+            query = _context.Projects;
+        }
+        else
+        {
+            var managedProjects = _context.Projects.Where(p => p.ProjectManagerId == userId);
+            var memberProjects = _context.Projects.Where(p => p.ProjectMembers.Any(pm => pm.UserId == userId));
+            query = managedProjects.Union(memberProjects);
+        }
 
-        var projects = await managedProjects
-            .Union(memberProjects)
+        var projects = await query
             .Include(p => p.ProjectManager)
             .Include(p => p.Tasks)
             .Include(p => p.ProjectMembers)
